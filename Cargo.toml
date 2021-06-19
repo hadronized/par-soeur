@@ -1,0 +1,15 @@
+[package]
+name = "par-soeur"
+version = "0.1.0"
+license = "BSD-3-Clause"
+authors = ["Dimitri Sabadie <dimitri.sabadie@gmail.com>"]
+description = "TEST TEST TEST"
+keywords = ["parser"]
+categories = ["TEST"]
+homepage = "https://github.com/phaazon/TODO"
+repository = "https://github.com/phaazon/TODO"
+documentation = "https://docs.rs/TODO"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
