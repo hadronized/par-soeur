@@ -189,7 +189,10 @@ where
     }
   }
 
-  pub fn or(self, other: Self) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I> {
+  pub fn or(
+    self,
+    other: TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I>,
+  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I> {
     TopParser {
       parser: move |input| match (self.parser)(input) {
         Parser::NoParse => (other.parser)(input),
@@ -204,6 +207,15 @@ where
 pub enum Parser<'a, A, I: ?Sized> {
   Parsed { data: A, input: &'a I },
   NoParse,
+}
+
+impl<'a, A, I: ?Sized> Parser<'a, A, I> {
+  pub fn ok(self) -> Option<A> {
+    match self {
+      Parser::Parsed { data, .. } => Some(data),
+      Parser::NoParse => None,
+    }
+  }
 }
 
 impl<'a, A, I: ?Sized> From<Option<Parser<'a, A, I>>> for Parser<'a, A, I> {

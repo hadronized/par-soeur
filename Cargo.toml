@@ -13,3 +13,11 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
+
+[dev-dependencies]
+lexical-core = "0.7.6"
+
+[[examples]]
+name = "json"
+path = "examples/json.rs"
+
