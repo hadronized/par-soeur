@@ -16,36 +16,37 @@ fn value_parser<'a>() -> TopParser<'a, fn(&'a str) -> Parser<'a, Value, str>, Va
 }
 
 fn value_parser_fn(input: &str) -> Parser<Value, str> {
-  fn string_parser_fn(input: &str) -> Parser<String, str> {
-    if input.is_empty() {
-      return Parser::NoParse;
-    }
+  let string_parser = || {
+    TopParser::from_input_parser(|input: &str| {
+      if input.is_empty() {
+        return Parser::NoParse;
+      }
 
-    let mut chars = input.chars();
-    if chars.next() != Some('"') {
-      return Parser::NoParse;
-    }
+      let mut chars = input.chars();
+      if chars.next() != Some('"') {
+        return Parser::NoParse;
+      }
 
-    let mut escaped = false;
-    let s: String = chars
-      .take_while(|&c| {
-        escaped = c == '\'';
-        c != '"' && !escaped
-      })
-      .collect();
+      let mut escaped = false;
+      let s: String = chars
+        .take_while(|&c| {
+          escaped = c == '\'';
+          c != '"' && !escaped
+        })
+        .collect();
 
-    let input = &input[1 + s.len()..];
+      let input = &input[1 + s.len()..];
 
-    if input.is_empty() {
-      return Parser::NoParse;
-    }
+      if input.is_empty() {
+        return Parser::NoParse;
+      }
 
-    let input = &input[1..];
-    Parser::Parsed { data: s, input }
-  }
-  let string_parser = || TopParser::from_input_parser(string_parser_fn);
+      let input = &input[1..];
+      Parser::Parsed { data: s, input }
+    })
+  };
 
-  fn number_parser_fn(input: &str) -> Parser<Value, str> {
+  let number_parser = TopParser::from_input_parser(|input: &str| {
     let m = input
       .chars()
       .take_while(|&c| c.is_ascii_digit() || "-.".contains(c));
@@ -60,8 +61,7 @@ fn value_parser_fn(input: &str) -> Parser<Value, str> {
       },
       None => Parser::NoParse,
     }
-  }
-  let number_parser = TopParser::from_input_parser(number_parser_fn);
+  });
 
   let bool_parser = {
     parse_lexeme("true")

@@ -17,7 +17,7 @@ edition = "2018"
 [dev-dependencies]
 lexical-core = "0.7.6"
 
-[[examples]]
+[[example]]
 name = "json"
 path = "examples/json.rs"
 
