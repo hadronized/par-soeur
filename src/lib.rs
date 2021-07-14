@@ -201,6 +201,82 @@ where
       _phantom: PhantomData,
     }
   }
+
+  pub fn delimited0<B>(
+    self,
+    delimiter: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
+  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
+    TopParser::from_input_parser(move |mut i| {
+      let mut even = true;
+      let mut results = Vec::new();
+
+      loop {
+        if even {
+          if let Parser::Parsed { data, input } = self.parse(i) {
+            results.push(data);
+            i = input;
+          } else {
+            break;
+          }
+        } else {
+          if let Parser::Parsed { input, .. } = delimiter.parse(i) {
+            i = input;
+          } else {
+            break;
+          }
+        }
+
+        even = !even;
+      }
+
+      if !even || results.is_empty() {
+        Parser::Parsed {
+          data: results,
+          input: i,
+        }
+      } else {
+        Parser::NoParse
+      }
+    })
+  }
+
+  pub fn delimited1<B>(
+    self,
+    delimiter: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
+  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
+    TopParser::from_input_parser(move |mut i| {
+      let mut even = true;
+      let mut results = Vec::new();
+
+      loop {
+        if even {
+          if let Parser::Parsed { data, input } = self.parse(i) {
+            results.push(data);
+            i = input;
+          } else {
+            break;
+          }
+        } else {
+          if let Parser::Parsed { input, .. } = delimiter.parse(i) {
+            i = input;
+          } else {
+            break;
+          }
+        }
+
+        even = !even;
+      }
+
+      if even {
+        Parser::NoParse
+      } else {
+        Parser::Parsed {
+          data: results,
+          input: i,
+        }
+      }
+    })
+  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
