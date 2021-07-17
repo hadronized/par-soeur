@@ -11,11 +11,11 @@ enum Value {
   Null,
 }
 
-fn value_parser<'a>() -> TopParser<'a, fn(&'a str) -> Parser<'a, Value, str>, Value, str> {
+fn value_parser<'a>() -> TopParser<'a, fn(&'a str) -> Parser<Value, &'a str>, Value, &'a str> {
   TopParser::from_input_parser(value_parser_fn)
 }
 
-fn value_parser_fn(input: &str) -> Parser<Value, str> {
+fn value_parser_fn(input: &str) -> Parser<Value, &str> {
   let string_parser = || {
     TopParser::from_input_parser(|input: &str| {
       if input.is_empty() {

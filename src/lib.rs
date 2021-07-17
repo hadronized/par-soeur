@@ -1,8 +1,11 @@
+pub mod input;
+
 use std::marker::PhantomData;
 
 pub struct TopParser<'a, F, A, I>
 where
-  I: ?Sized,
+  I: 'a,
+  F: 'a,
 {
   parser: F,
   _phantom: PhantomData<&'a (A, I)>,
@@ -10,8 +13,8 @@ where
 
 impl<'a, F, A, I> TopParser<'a, F, A, I>
 where
-  I: ?Sized + PartialEq,
-  F: Fn(&'a I) -> Parser<'a, A, I>,
+  I: 'a + PartialEq,
+  F: 'a + Fn(I) -> Parser<A, I>,
 {
   pub fn from_input_parser(f: F) -> Self {
     TopParser {
@@ -20,15 +23,15 @@ where
     }
   }
 
-  pub fn parse(&self, input: &'a I) -> Parser<'a, A, I> {
+  pub fn parse(&self, input: I) -> Parser<A, I> {
     (self.parser)(input)
   }
 
   pub fn zip<B, C>(
     self,
-    other: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
-    f: impl Fn(A, B) -> C,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, C, I>, C, I> {
+    other: TopParser<'a, impl Fn(I) -> Parser<B, I>, B, I>,
+    f: impl 'a + Fn(A, B) -> C,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<C, I>, C, I> {
     TopParser {
       parser: move |input| match (self.parser)(input) {
         Parser::Parsed { data, input } => match (other.parser)(input) {
@@ -46,8 +49,8 @@ where
 
   pub fn left<B>(
     self,
-    other: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I> {
+    other: TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<A, I>, A, I> {
     TopParser {
       parser: move |input| match (self.parser)(input) {
         Parser::Parsed { data, input } => match (other.parser)(input) {
@@ -62,8 +65,8 @@ where
 
   pub fn right<B>(
     self,
-    other: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I> {
+    other: TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I> {
     TopParser {
       parser: move |input| match (self.parser)(input) {
         Parser::Parsed { input, .. } => match (other.parser)(input) {
@@ -79,9 +82,9 @@ where
   pub fn and_then<B, G>(
     self,
     f: impl Fn(A) -> TopParser<'a, G, B, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>
   where
-    G: Fn(&'a I) -> Parser<'a, B, I>,
+    G: 'a + Fn(I) -> Parser<B, I>,
   {
     TopParser {
       parser: move |input| match (self.parser)(input) {
@@ -94,8 +97,8 @@ where
 
   pub fn map<B>(
     self,
-    f: impl Fn(A) -> B,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I> {
+    f: impl 'a + Fn(A) -> B,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I> {
     TopParser {
       parser: move |input| match (self.parser)(input) {
         Parser::Parsed { data, input } => Parser::Parsed {
@@ -108,7 +111,7 @@ where
     }
   }
 
-  pub fn const_map<B>(self, b: B) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>
+  pub fn const_map<B>(self, b: B) -> TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>
   where
     B: Clone,
   {
@@ -124,12 +127,15 @@ where
     }
   }
 
-  pub fn many0(self) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
+  pub fn many0(self) -> TopParser<'a, impl 'a + Fn(I) -> Parser<Vec<A>, I>, Vec<A>, I>
+  where
+    I: Clone,
+  {
     TopParser {
-      parser: move |mut i| {
+      parser: move |mut i: I| {
         let mut results = Vec::new();
 
-        while let Parser::Parsed { data, input } = (self.parser)(i) {
+        while let Parser::Parsed { data, input } = (self.parser)(i.clone()) {
           if input == i {
             // input hasn’t changed, which might indicate that the parser didn’t consume; break
             break;
@@ -148,12 +154,15 @@ where
     }
   }
 
-  pub fn many1(self) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
+  pub fn many1(self) -> TopParser<'a, impl 'a + Fn(I) -> Parser<Vec<A>, I>, Vec<A>, I>
+  where
+    I: Clone,
+  {
     TopParser {
-      parser: move |mut i| {
+      parser: move |mut i: I| {
         let mut results = Vec::new();
 
-        while let Parser::Parsed { data, input } = (self.parser)(i) {
+        while let Parser::Parsed { data, input } = (self.parser)(i.clone()) {
           // input hasn’t changed, which might indicate that the parser didn’t consume; break
           if input == i {
             break;
@@ -176,9 +185,12 @@ where
     }
   }
 
-  pub fn opt(self) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Option<A>, I>, Option<A>, I> {
+  pub fn opt(self) -> TopParser<'a, impl 'a + Fn(I) -> Parser<Option<A>, I>, Option<A>, I>
+  where
+    I: Clone,
+  {
     TopParser {
-      parser: move |input| match (self.parser)(input) {
+      parser: move |input: I| match (self.parser)(input.clone()) {
         Parser::Parsed { data, input } => Parser::Parsed {
           data: Some(data),
           input,
@@ -191,10 +203,13 @@ where
 
   pub fn or(
     self,
-    other: TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, A, I>, A, I> {
+    other: TopParser<'a, impl 'a + Fn(I) -> Parser<A, I>, A, I>,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<A, I>, A, I>
+  where
+    I: Clone,
+  {
     TopParser {
-      parser: move |input| match (self.parser)(input) {
+      parser: move |input: I| match (self.parser)(input.clone()) {
         Parser::NoParse => (other.parser)(input),
         p => p,
       },
@@ -204,22 +219,25 @@ where
 
   pub fn delimited0<B>(
     self,
-    delimiter: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
-    TopParser::from_input_parser(move |mut i| {
+    delimiter: TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<Vec<A>, I>, Vec<A>, I>
+  where
+    I: Clone,
+  {
+    TopParser::from_input_parser(move |mut i: I| {
       let mut even = true;
       let mut results = Vec::new();
 
       loop {
         if even {
-          if let Parser::Parsed { data, input } = self.parse(i) {
+          if let Parser::Parsed { data, input } = self.parse(i.clone()) {
             results.push(data);
             i = input;
           } else {
             break;
           }
         } else {
-          if let Parser::Parsed { input, .. } = delimiter.parse(i) {
+          if let Parser::Parsed { input, .. } = delimiter.parse(i.clone()) {
             i = input;
           } else {
             break;
@@ -242,22 +260,25 @@ where
 
   pub fn delimited1<B>(
     self,
-    delimiter: TopParser<'a, impl Fn(&'a I) -> Parser<'a, B, I>, B, I>,
-  ) -> TopParser<'a, impl Fn(&'a I) -> Parser<'a, Vec<A>, I>, Vec<A>, I> {
-    TopParser::from_input_parser(move |mut i| {
+    delimiter: TopParser<'a, impl 'a + Fn(I) -> Parser<B, I>, B, I>,
+  ) -> TopParser<'a, impl 'a + Fn(I) -> Parser<Vec<A>, I>, Vec<A>, I>
+  where
+    I: Clone,
+  {
+    TopParser::from_input_parser(move |mut i: I| {
       let mut even = true;
       let mut results = Vec::new();
 
       loop {
         if even {
-          if let Parser::Parsed { data, input } = self.parse(i) {
+          if let Parser::Parsed { data, input } = self.parse(i.clone()) {
             results.push(data);
             i = input;
           } else {
             break;
           }
         } else {
-          if let Parser::Parsed { input, .. } = delimiter.parse(i) {
+          if let Parser::Parsed { input, .. } = delimiter.parse(i.clone()) {
             i = input;
           } else {
             break;
@@ -280,12 +301,12 @@ where
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Parser<'a, A, I: ?Sized> {
-  Parsed { data: A, input: &'a I },
+pub enum Parser<A, I> {
+  Parsed { data: A, input: I },
   NoParse,
 }
 
-impl<'a, A, I: ?Sized> Parser<'a, A, I> {
+impl<'a, A, I> Parser<A, I> {
   pub fn ok(self) -> Option<A> {
     match self {
       Parser::Parsed { data, .. } => Some(data),
@@ -294,13 +315,13 @@ impl<'a, A, I: ?Sized> Parser<'a, A, I> {
   }
 }
 
-impl<'a, A, I: ?Sized> From<Option<Parser<'a, A, I>>> for Parser<'a, A, I> {
-  fn from(x: Option<Parser<'a, A, I>>) -> Self {
+impl<'a, A, I> From<Option<Parser<A, I>>> for Parser<A, I> {
+  fn from(x: Option<Parser<A, I>>) -> Self {
     x.unwrap_or_else(|| Parser::NoParse)
   }
 }
 
-pub fn parse_u32<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, u32, str>, u32, str> {
+pub fn parse_u32<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<u32, &'a str>, u32, &'a str> {
   TopParser::from_input_parser(|input: &'a str| {
     let mut count = 0;
     let len = input.len();
@@ -321,7 +342,7 @@ pub fn parse_u32<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, u32, str>
   })
 }
 
-pub fn parse_spaces<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, (), str>, (), str> {
+pub fn parse_spaces<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<(), &'a str>, (), &'a str> {
   TopParser::from_input_parser(|input: &'a str| {
     let mut count = 0;
     let len = input.len();
@@ -340,7 +361,7 @@ pub fn parse_spaces<'a>() -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, (), st
 
 pub fn parse_lexeme<'a>(
   l: &'a str,
-) -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, (), str>, (), str> {
+) -> TopParser<'a, impl Fn(&'a str) -> Parser<(), &'a str>, (), &'a str> {
   TopParser {
     parser: move |input: &'a str| {
       if input.starts_with(l) {
@@ -358,7 +379,7 @@ pub fn parse_lexeme<'a>(
 
 pub fn parse_take<'a>(
   count: usize,
-) -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, &'a str, str>, &'a str, str> {
+) -> TopParser<'a, impl Fn(&'a str) -> Parser<&'a str, &'a str>, &'a str, &'a str> {
   TopParser {
     parser: move |input: &'a str| {
       if input.len() >= count {
@@ -376,7 +397,7 @@ pub fn parse_take<'a>(
 
 pub fn parse_while<'a>(
   predicate: impl Fn(char) -> bool,
-) -> TopParser<'a, impl Fn(&'a str) -> Parser<'a, &'a str, str>, &'a str, str> {
+) -> TopParser<'a, impl Fn(&'a str) -> Parser<&'a str, &'a str>, &'a str, &'a str> {
   TopParser {
     parser: move |input: &'a str| {
       let count = input.chars().take_while(|c| predicate(*c)).count();
