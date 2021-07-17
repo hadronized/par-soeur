@@ -1,4 +1,4 @@
-use par_soeur::{parse_lexeme, Parser, TopParser};
+use par_soeur::{input::LineBasedStr, parse_lexeme, Parser, TopParser};
 use std::{collections::HashMap, io::stdin};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -11,38 +11,58 @@ enum Value {
   Null,
 }
 
-fn value_parser<'a>() -> TopParser<'a, fn(&'a str) -> Parser<Value, &'a str>, Value, &'a str> {
+fn value_parser<'a>(
+) -> TopParser<'a, fn(LineBasedStr<'a>) -> Parser<Value, LineBasedStr<'a>>, Value, LineBasedStr<'a>>
+{
   TopParser::from_input_parser(value_parser_fn)
 }
 
-fn value_parser_fn(input: &str) -> Parser<Value, &str> {
+fn value_parser_fn(input: LineBasedStr) -> Parser<Value, LineBasedStr> {
   let string_parser = || {
-    TopParser::from_input_parser(|input: &str| {
-      if input.is_empty() {
+    TopParser::from_input_parser(|input: LineBasedStr| {
+      let s = input.as_str();
+
+      if s.is_empty() {
         return Parser::NoParse;
       }
 
-      let mut chars = input.chars();
+      let mut chars = s.chars();
       if chars.next() != Some('"') {
         return Parser::NoParse;
       }
 
-      let mut escaped = false;
-      let s: String = chars
-        .take_while(|&c| {
-          escaped = c == '\'';
-          c != '"' && !escaped
-        })
-        .collect();
+      loop {
+        let c = chars.next();
 
-      let input = &input[1 + s.len()..];
+        match c {
+          Some('\') => {
+            match chars.next() {
+              Some('u') => {
+                let a = chars.next();
+                let b = chars.next();
+                let c = chars.next();
+                let d = chars.next();
+
+                match (a, b, c, d) {
+                  (Some(a), Some(b), Some(c), Some(d)) if a.is_ascii_hexdigit() && b.is_ascii_hexdigit() && c.is_ascii_hexdigit() && d.is_ascii_hexdigit() => {
+                    let o = vec![
+                      u32::from_str_radix(a, radix)
+                  }
+                }
+              }
+            }
+          },
+        }
+      }
+
+      // let input = &input[1 + s.len()..];
 
       if input.is_empty() {
         return Parser::NoParse;
       }
 
       let input = &input[1..];
-      Parser::Parsed { data: s, input }
+      Parser::Parsed { data, input }
     })
   };
 
